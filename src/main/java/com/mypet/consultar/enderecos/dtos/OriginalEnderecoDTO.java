@@ -3,9 +3,10 @@ package com.mypet.consultar.enderecos.dtos;
 import lombok.Data;
 
 @Data
-public class EnderecoDTO {
+public class OriginalEnderecoDTO {
     private long id;
     private Long pessoaId;
+    private String cpf;
     private String numero;
     private String complemento;
     private String bairro;

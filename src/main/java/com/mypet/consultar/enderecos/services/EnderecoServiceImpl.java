@@ -17,13 +17,14 @@ public class EnderecoServiceImpl {
     private ProducerTemplate producerTemplate;
 
     @Transactional
-    public ResponseEntity<?> adicionarEndereco(String cep) {
+    public ResponseEntity<?> adicionarEndereco(String cep, String cpf) {
         try {
             Map<String, Object> headers = new HashMap<>();
             headers.put("cep", cep);
+            headers.put("cpf", cpf);
 
-            // Chama a rota Camel para buscar o endereço por CEP
-            producerTemplate.sendBodyAndHeaders("direct:buscarEnderecoPorCep", null, headers);
+            // Chama a rota Camel para buscar o endereço por CEP e CPF
+            producerTemplate.sendBodyAndHeaders("direct:buscarEnderecoPessoa", null, headers);
             return new ResponseEntity<>("Endereço processado com sucesso!", HttpStatus.CREATED);
         } catch (Exception e) {
             // Log de erro detalhado

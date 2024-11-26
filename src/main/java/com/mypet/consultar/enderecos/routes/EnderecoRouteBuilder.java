@@ -2,42 +2,53 @@ package com.mypet.consultar.enderecos.routes;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.component.jackson.JacksonDataFormat;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.apache.camel.LoggingLevel;  // Adicione esta importação
 
 @Component
 public class EnderecoRouteBuilder extends RouteBuilder {
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    private static final Logger log = LoggerFactory.getLogger(EnderecoRouteBuilder.class);
 
     @Override
     public void configure() throws Exception {
-        // Configura o formato de dados do Jackson para usar o ObjectMapper configurado
-        JacksonDataFormat jacksonDataFormat = new JacksonDataFormat(objectMapper, Object.class);
+        log.info("Iniciando ConsultaCepRouteBuilder");
 
-        // Tratamento de exceções
+        errorHandler(defaultErrorHandler()
+                .maximumRedeliveries(3)
+                .redeliveryDelay(2000)
+                .retryAttemptedLogLevel(LoggingLevel.WARN)
+                .logStackTrace(true)
+        );
+
         onException(Exception.class)
                 .log(LoggingLevel.ERROR, "Erro ao processar a troca: ${exception.message}")
                 .handled(true);
 
-        // Rota para buscar endereço pela API externa usando o CEP
-        from("direct:buscarEnderecoPorCep")
+        // Rota para buscar pessoa por CPF
+        log.info("Registrando rota: direct:buscarPessoaPorCpf");
+        from("direct:buscarPessoaPorCpf")
                 .setHeader("CamelHttpMethod", constant("GET"))
-                .toD("http4://api.externa.de.enderecos/cep/${header.cep}")
-                .unmarshal(jacksonDataFormat)
-                .log(LoggingLevel.INFO, "Endereço obtido: ${body}")
-                .to("direct:salvarEndereco");
+                .toD("http://localhost:9090/api/pessoas/cpf/${header.cpf}")
+                .convertBodyTo(String.class);
 
-        // Rota para salvar endereço na API interna
+        // Rota para salvar endereço
+        log.info("Registrando rota: direct:salvarEndereco");
         from("direct:salvarEndereco")
-                .log(LoggingLevel.INFO, "Salvando endereço: ${body}")
                 .setHeader("CamelHttpMethod", constant("POST"))
                 .setHeader("Content-Type", constant("application/json"))
-                .marshal(jacksonDataFormat)
-                .to("http://localhost:8080/api/enderecos");
+                .marshal().json()
+                .to("http://localhost:7070/api/enderecos")
+                .log(LoggingLevel.INFO, "Endereço cadastrado com sucesso: ${body}");
+    }
+
+    private ObjectMapper createObjectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JavaTimeModule javaTimeModule = new JavaTimeModule();
+        objectMapper.registerModule(javaTimeModule);
+        return objectMapper;
     }
 }
