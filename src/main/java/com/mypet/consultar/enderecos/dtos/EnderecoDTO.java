@@ -21,7 +21,7 @@ public class EnderecoDTO {
     private String estado;
     private String cep;
     private String pais = "Brasil";
-    private String tipoDePessoa;
+    private String perfil;
 
     private String tipoDeEndereco;
 }
