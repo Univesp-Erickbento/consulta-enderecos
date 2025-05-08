@@ -43,7 +43,7 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                 .log("Pessoa encontrada: ${body}")
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .removeHeader("Authorization")
-                .toD("http://localhost:7070/api/endereco/${header.cep}?bridgeEndpoint=true")
+                .toD("http://localhost:9092/api/endereco/${header.cep}?bridgeEndpoint=true")
                 .unmarshal().json(JsonLibrary.Jackson)
                 .setProperty("enderecoJson", simple("${body}"))
                 .log("Endereço encontrado: ${body}")
@@ -102,7 +102,7 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                 .setHeader("CamelHttpMethod", constant("POST"))
                 .setHeader("Content-Type", constant("application/json"))
                 .marshal().json(JsonLibrary.Jackson)
-                .to("http://localhost:7070/api/endereco?bridgeEndpoint=true")
+                .to("http://localhost:9092/api/endereco?bridgeEndpoint=true")
                 .convertBodyTo(String.class)
                 .log("Resposta do serviço de salvar endereço: ${body}");
     }
