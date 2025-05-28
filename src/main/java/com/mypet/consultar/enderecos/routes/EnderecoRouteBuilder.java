@@ -2,6 +2,7 @@ package com.mypet.consultar.enderecos.routes;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.mypet.consultar.enderecos.config.EnderecoProperties;
 import com.mypet.consultar.enderecos.dtos.EnderecoCompletoDTO;
 import com.mypet.consultar.enderecos.processor.PessoaComEnderecoProcessor;
 import org.apache.camel.LoggingLevel;
@@ -13,7 +14,6 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
-
 @Component
 public class EnderecoRouteBuilder extends RouteBuilder {
 
@@ -23,10 +23,12 @@ public class EnderecoRouteBuilder extends RouteBuilder {
     @Autowired
     private PessoaComEnderecoProcessor pessoaComEnderecoProcessor;
 
+    @Autowired
+    private EnderecoProperties enderecoProperties;
+
     @Override
     public void configure() throws Exception {
         objectMapper.registerModule(new JavaTimeModule());
-        JacksonDataFormat jacksonDataFormat = new JacksonDataFormat(objectMapper, Object.class);
 
         onException(Exception.class)
                 .log(LoggingLevel.ERROR, "Erro ao processar a troca: ${exception.message}")
@@ -37,13 +39,13 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                 .log("Recebido CPF=${header.cpf}, CEP=${header.cep}")
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .setHeader("Authorization", simple("${header.Authorization}"))
-                .toD("http://localhost:9090/api/pessoas/cpf/${header.cpf}?bridgeEndpoint=true")
+                .toD(enderecoProperties.getPessoaServiceUrl() + "/cpf/${header.cpf}?bridgeEndpoint=true")
                 .unmarshal().json(JsonLibrary.Jackson)
                 .setProperty("pessoaJson", simple("${body}"))
                 .log("Pessoa encontrada: ${body}")
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .removeHeader("Authorization")
-                .toD("http://localhost:9092/api/endereco/${header.cep}?bridgeEndpoint=true")
+                .toD(enderecoProperties.getApiBaseUrl() + "/${header.cep}?bridgeEndpoint=true")
                 .unmarshal().json(JsonLibrary.Jackson)
                 .setProperty("enderecoJson", simple("${body}"))
                 .log("Endereço encontrado: ${body}")
@@ -60,7 +62,7 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                   "tipoDePessoa": "${property.pessoaJson.perfil}",
                   "tipoDeEndereco": "Residencial"
                 }
-            """)
+                """)
                 .process(pessoaComEnderecoProcessor)
                 .log("Payload final após processamento: ${body}");
 
@@ -69,7 +71,7 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                 .log("Recebendo endereço completo para CPF=${header.cpf}")
                 .setHeader("CamelHttpMethod", constant("GET"))
                 .setHeader("Authorization", simple("${header.Authorization}"))
-                .toD("http://localhost:9090/api/pessoas/cpf/${header.cpf}?bridgeEndpoint=true")
+                .toD(enderecoProperties.getPessoaServiceUrl() + "/cpf/${header.cpf}?bridgeEndpoint=true")
                 .unmarshal().json(JsonLibrary.Jackson)
                 .setProperty("pessoa", simple("${body}"))
                 .log("Pessoa encontrada: ${body}")
@@ -81,6 +83,7 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                     if (idObj == null) {
                         throw new IllegalStateException("ID da pessoa não encontrado na resposta do serviço de pessoas.");
                     }
+
                     Long pessoaId = Long.parseLong(idObj.toString());
 
                     Map<String, Object> enderecoFinal = new HashMap<>();
@@ -102,7 +105,7 @@ public class EnderecoRouteBuilder extends RouteBuilder {
                 .setHeader("CamelHttpMethod", constant("POST"))
                 .setHeader("Content-Type", constant("application/json"))
                 .marshal().json(JsonLibrary.Jackson)
-                .to("http://localhost:9092/api/endereco?bridgeEndpoint=true")
+                .to(enderecoProperties.getApiBaseUrl() + "?bridgeEndpoint=true")
                 .convertBodyTo(String.class)
                 .log("Resposta do serviço de salvar endereço: ${body}");
     }

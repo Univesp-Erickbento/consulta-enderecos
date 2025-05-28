@@ -1,20 +1,19 @@
 package com.mypet.consultar.enderecos.routes;
 
+import com.mypet.consultar.enderecos.config.EnderecoProperties;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Component
 public class PessoaEnderecoRouteBuilder extends RouteBuilder {
 
-    private static final String PESSOA_SERVICE_URL = "http://localhost:9090/api/pessoas/cpf";
-    private static final String ENDERECO_SERVICE_URL = "http://localhost:9092/api/endereco/pessoa";
+    @Autowired
+    private EnderecoProperties enderecoProperties;
 
     @Override
     public void configure() throws Exception {
@@ -26,7 +25,7 @@ public class PessoaEnderecoRouteBuilder extends RouteBuilder {
                 // 1. Buscar a pessoa pelo CPF
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
                 .setHeader("Authorization", simple("${header.Authorization}"))
-                .toD(PESSOA_SERVICE_URL + "/${header.cpf}?bridgeEndpoint=true")
+                .toD(enderecoProperties.getPessoaServiceUrl() + "/cpf/${header.cpf}?bridgeEndpoint=true")
                 .unmarshal().json(JsonLibrary.Jackson)
                 .process(exchange -> {
                     Map<String, Object> pessoaMap = exchange.getIn().getBody(Map.class);
@@ -47,7 +46,7 @@ public class PessoaEnderecoRouteBuilder extends RouteBuilder {
                 // 2. Buscar endereços da pessoa
                 .setHeader(Exchange.HTTP_METHOD, constant("GET"))
                 .removeHeader("Authorization") // Remova se o serviço de endereços não exige autenticação
-                .toD(ENDERECO_SERVICE_URL + "/${exchangeProperty.pessoaId}?bridgeEndpoint=true")
+                .toD(enderecoProperties.getApiBaseUrl() + "/pessoa/${exchangeProperty.pessoaId}?bridgeEndpoint=true")
                 .unmarshal().json(JsonLibrary.Jackson)
                 .log("Endereços encontrados: ${body}")
 

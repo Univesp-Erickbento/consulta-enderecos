@@ -3,8 +3,8 @@ package com.mypet.consultar.enderecos.routes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.mypet.consultar.enderecos.config.EnderecoProperties;
 import com.mypet.consultar.enderecos.services.AuthService;
-
 import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
@@ -18,13 +18,14 @@ import java.util.Map;
 @Component
 public class PessoaRouteBuilder extends RouteBuilder {
 
-    private static final String PESSOA_SERVICE_URL = "http://192.168.15.115:9090/api/pessoas";
-
     @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
     private AuthService authService;
+
+    @Autowired
+    private EnderecoProperties enderecoProperties;
 
     @Override
     public void configure() throws Exception {
@@ -55,20 +56,17 @@ public class PessoaRouteBuilder extends RouteBuilder {
                     String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
                     log.info("Cabeçalho Authorization: " + authorizationHeader);
                     if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-                        log.error("Token de autorização inválido ou não fornecido.");
                         throw new IllegalArgumentException("Token de autorização inválido ou não fornecido.");
                     }
                     String token = authService.extractToken(exchange);
                     if (token == null || token.trim().isEmpty()) {
-                        log.error("Token extraído está vazio ou inválido.");
-                        throw new IllegalArgumentException("Token de autorização inválido ou não fornecido.");
+                        throw new IllegalArgumentException("Token extraído está vazio ou inválido.");
                     }
-                    log.info("Token de autorização extraído: " + token);
                     exchange.getIn().setHeader("Authorization", "Bearer " + token);
                 })
                 .log(LoggingLevel.INFO, "Token de autorização após processamento: ${header.Authorization}")
-                .log(LoggingLevel.INFO, "URL da Requisição: " + PESSOA_SERVICE_URL + "/cpf/${header.cpf}")
-                .toD(PESSOA_SERVICE_URL + "/cpf/${header.cpf}")
+                .log(LoggingLevel.INFO, "URL da Requisição: " + enderecoProperties.getPessoaServiceUrl() + "/cpf/${header.cpf}")
+                .toD(enderecoProperties.getPessoaServiceUrl() + "/cpf/${header.cpf}")
                 .log(LoggingLevel.INFO, "Resposta da API para o CPF ${header.cpf}: ${body}")
                 .convertBodyTo(String.class);
 
@@ -78,13 +76,11 @@ public class PessoaRouteBuilder extends RouteBuilder {
                 .process(exchange -> {
                     String authorizationHeader = exchange.getIn().getHeader("Authorization", String.class);
                     if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-                        log.error("Token de autorização inválido ou não fornecido.");
                         throw new IllegalArgumentException("Token de autorização inválido ou não fornecido.");
                     }
                     String token = authService.extractToken(exchange);
                     if (token == null || token.trim().isEmpty()) {
-                        log.error("Token extraído está vazio ou inválido.");
-                        throw new IllegalArgumentException("Token de autorização inválido ou não fornecido.");
+                        throw new IllegalArgumentException("Token extraído está vazio ou inválido.");
                     }
                     exchange.getIn().setHeader("Authorization", "Bearer " + token);
                 })
@@ -97,15 +93,13 @@ public class PessoaRouteBuilder extends RouteBuilder {
                         Object body = exchange.getIn().getBody();
                         String jsonBody = objectMapper.writeValueAsString(body);
                         exchange.getIn().setBody(jsonBody, String.class);
-                        log.info("Corpo da mensagem convertido para JSON com sucesso.");
                     } catch (JsonProcessingException e) {
-                        log.error("Erro ao converter o corpo da mensagem para JSON: " + e.getMessage(), e);
                         exchange.setProperty(Exchange.ROUTE_STOP, Boolean.TRUE);
                         throw new IllegalArgumentException("Erro ao converter o corpo da mensagem para JSON", e);
                     }
                 })
-                .log(LoggingLevel.INFO, "URL da Requisição de Atualização: " + PESSOA_SERVICE_URL + "/${header.id}")
-                .toD(PESSOA_SERVICE_URL + "/${header.id}")
+                .log(LoggingLevel.INFO, "URL da Requisição de Atualização: " + enderecoProperties.getPessoaServiceUrl() + "/${header.id}")
+                .toD(enderecoProperties.getPessoaServiceUrl() + "/${header.id}")
                 .convertBodyTo(String.class);
 
         // Rota para transformar dados da pessoa
@@ -116,7 +110,6 @@ public class PessoaRouteBuilder extends RouteBuilder {
                     Map<String, Object> pessoaJson = exchange.getMessage().getBody(Map.class);
                     Map<String, Object> enderecoJson = (Map<String, Object>) pessoaJson.get("endereco");
 
-                    // Extrai campos e salva como propriedades simples
                     exchange.setProperty("pessoaId", pessoaJson.get("pessoaId"));
                     exchange.setProperty("perfil", pessoaJson.get("perfil"));
 
@@ -141,6 +134,8 @@ public class PessoaRouteBuilder extends RouteBuilder {
                               "tipoDeEndereco": "Residencial"
                             }
                         """))
+
+
                 .log(LoggingLevel.INFO, "JSON transformado: ${body}");
     }
     }
